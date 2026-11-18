@@ -1,0 +1,14 @@
+services:
+  chatbot:
+    build: .
+    ports:
+      - "10000:10000"
+    environment:
+      PORT: 10000
+      DATA_DIR: /app/data
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openrouter/free}
+      INGEST_TOKEN: ${INGEST_TOKEN:-}
+      MAX_CRAWL_PAGES: ${MAX_CRAWL_PAGES:-35}
+    volumes:
+      - ./data:/app/data
