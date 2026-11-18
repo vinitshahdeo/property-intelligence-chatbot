@@ -36,7 +36,7 @@ The scraper respects `robots.txt`, waits between requests (`CRAWL_DELAY`, 1.5s b
 ## Deploy (Fly.io)
 
 ```bash
-fly secrets set OPENROUTER_API_KEY=... INGEST_TOKEN=...
+fly secrets set OPENROUTER_API_KEY=...
 fly deploy
 ```
 
@@ -49,9 +49,6 @@ The database is built into the Docker image, so the app has data as soon as it s
 | `POST /api/chat` | `{"message": "...", "history": []}` |
 | `GET /api/stats` | Document counts and recent scrape runs |
 | `GET /health` | Health check |
-| `POST /api/ingest/wasalt/scrape` | Run the Wasalt scraper (needs `X-Ingest-Token`) |
-| `POST /api/ingest/darglobal` | Run the DarGlobal scraper (needs `X-Ingest-Token`) |
-| `POST /api/ingest/wasalt` | Upload a JSON file of listings (needs `X-Ingest-Token`) |
 
 ---
 

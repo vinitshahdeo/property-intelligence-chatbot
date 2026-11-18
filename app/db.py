@@ -66,9 +66,6 @@ def _doc_row(doc, now):
     return (doc.get("source", "Unknown"), doc["title"], doc["url"], doc["content"],
             doc.get("location", ""), doc.get("property_type", ""), doc.get("price", ""), now)
 
-def upsert_document(doc):
-    upsert_documents([doc])
-
 def upsert_documents(docs):
     now = datetime.now(timezone.utc).isoformat()
     with connect() as con:
