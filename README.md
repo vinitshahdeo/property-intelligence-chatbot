@@ -4,6 +4,8 @@ A chatbot for asking questions about property listings in Saudi Arabia. It searc
 
 Built with FastAPI and SQLite full-text search. If you add an [OpenRouter](https://openrouter.ai/keys) key, answers are written by an LLM; without one, the app still works and returns a short summary of the matching listings.
 
+**View Live: [property-intelligence-chatbot.fly.dev](https://property-intelligence-chatbot.fly.dev)**
+
 ## Run it
 
 ```bash
