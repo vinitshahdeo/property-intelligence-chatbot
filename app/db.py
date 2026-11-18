@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from datetime import datetime, timezone
 from .config import DB_PATH
@@ -82,22 +83,49 @@ def log_run(source, status, pages_seen, records_saved, message=""):
              datetime.now(timezone.utc).isoformat())
         )
 
+_STOPWORDS = {"a", "an", "the", "in", "on", "at", "for", "of", "to", "and", "or", "with", "me", "show",
+              "find", "list", "any", "some", "what", "which", "are", "is", "there", "near", "around",
+              "please", "i", "want", "looking", "need", "can", "you", "get", "all", "available"}
+_NUMBER_WORDS = {"one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
+                 "seven": "7", "eight": "8", "nine": "9", "ten": "10"}
+
+def _query_terms(query):
+    words = re.findall(r"[^\W_]+", query.lower())
+    terms = []
+    for w in words:
+        w = _NUMBER_WORDS.get(w, w)
+        if w in _STOPWORDS or (len(w) < 2 and not w.isdigit()):
+            continue
+        terms.append(w)
+    return list(dict.fromkeys(terms))[:10]
+
+def _fts_term(t):
+    # Prefix-match a crude singular so "apartments" also matches "apartment".
+    if not t.isdigit() and len(t) > 4 and t.endswith("s"):
+        t = t[:-1]
+    return f'"{t}"*' if not t.isdigit() else f'"{t}"'
+
 def search_documents(query, limit=6):
-    terms = [t for t in query.replace('"', ' ').split() if len(t) > 1][:10]
+    terms = _query_terms(query)
     if not terms:
         return []
-    # FTS5 syntax is constructed only from alphanumeric tokens.
-    safe = " OR ".join('"' + ''.join(c for c in t if c.isalnum()) + '"' for t in terms)
-    safe = safe.replace('""', '')
+    fts_terms = [_fts_term(t) for t in terms]
+    rows = []
     with connect() as con:
-        try:
-            rows = con.execute("""
-              SELECT d.* FROM documents_fts f
-              JOIN documents d ON d.id=f.rowid
-              WHERE documents_fts MATCH ? ORDER BY rank LIMIT ?
-            """, (safe, limit)).fetchall()
-        except sqlite3.OperationalError:
-            rows = []
+        # Prefer documents matching every term; fall back to any term. Title matches weigh most.
+        for joiner in (" AND ", " OR "):
+            try:
+                rows = con.execute("""
+                  SELECT d.* FROM documents_fts f
+                  JOIN documents d ON d.id=f.rowid
+                  WHERE documents_fts MATCH ?
+                  ORDER BY bm25(documents_fts, 6.0, 1.0, 3.0, 1.0) - (d.price != '') * 2.0
+                  LIMIT ?
+                """, (joiner.join(fts_terms), limit)).fetchall()
+            except sqlite3.OperationalError:
+                rows = []
+            if rows:
+                break
         if not rows:
             clauses = " OR ".join("content LIKE ?" for _ in terms)
             rows = con.execute(

@@ -53,7 +53,9 @@ def chat(req: ChatRequest):
         error = None
     sources = [{
         "index": i + 1, "source": d["source"], "title": d["title"],
-        "url": d["url"], "updated_at": d["updated_at"]
+        "url": d["url"], "updated_at": d["updated_at"],
+        "location": d.get("location", ""), "property_type": d.get("property_type", ""),
+        "price": d.get("price", ""),
     } for i, d in enumerate(docs)]
     return {"answer": answer or grounded_fallback(req.message, docs),
             "sources": sources, "mode": mode, "warning": error}

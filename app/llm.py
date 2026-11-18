@@ -1,3 +1,4 @@
+import re
 import requests
 from .config import (OPENROUTER_API_KEY, OPENROUTER_MODEL,
                      OPENROUTER_SITE_URL, OPENROUTER_APP_NAME)
@@ -40,15 +41,49 @@ def answer_with_openrouter(question, history, docs):
     data = response.json()
     return data["choices"][0]["message"]["content"]
 
+def _price(p):
+    """'65000 SAR /Year' -> (65000.0, 'SAR', '/yr')"""
+    m = re.match(r"\s*([\d.,]+)\s*([A-Z]{3})?\s*(/\s*\w+)?", p or "")
+    if not m:
+        return None
+    try:
+        value = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    unit = (m.group(3) or "").replace(" ", "").lower()
+    unit = {"/year": "/yr", "/month": "/mo", "/day": "/night"}.get(unit, unit)
+    return value, m.group(2) or "SAR", unit
+
+def _fmt_price(v, cur, unit):
+    return f"{cur} {v:,.0f}{unit}"
+
 def grounded_fallback(question, docs):
     if not docs:
-        return ("I couldn't find matching information in the currently indexed sources. "
-                "The Wasalt dataset may not have been imported yet, or the requested detail "
-                "may not appear in the indexed DarGlobal pages.")
-    snippets = []
-    for i, d in enumerate(docs[:4], 1):
-        text = d["content"][:650].strip()
-        snippets.append(f"**{d['title']}** ({d['source']})\n{text}… [{i}]")
-    return ("I found these relevant source excerpts. Add an OpenRouter API key to enable "
-            "AI-generated synthesis; until then, this is a retrieval-only response.\n\n" +
-            "\n\n".join(snippets))
+        return ("I couldn't find anything matching that in the indexed listings. "
+                "Try a city (Riyadh, Jeddah, Khobar), a property type, or rent vs. sale.")
+    listings = [d for d in docs if "/property/" in d["url"] or "/dailyrental/" in d["url"]]
+    parts = [f"I found {len(docs)} matching {'page' if len(docs) == 1 else 'pages'}"
+             + (f", including {len(listings)} individual {'listing' if len(listings) == 1 else 'listings'}" if listings else "")
+             + "."]
+    priced = [(i, _price(d.get("price"))) for i, d in enumerate(docs, 1)]
+    priced = [(i, p) for i, p in priced if p]
+    if priced:
+        groups = {}
+        for i, (v, cur, unit) in priced:
+            groups.setdefault((cur, unit), []).append((v, i))
+        (cur, unit), items = max(groups.items(), key=lambda kv: len(kv[1]))
+        (lo, lo_i), (hi, hi_i) = min(items), max(items)
+        if lo == hi:
+            parts.append(f"The listed price is **{_fmt_price(lo, cur, unit)}** [{lo_i}].")
+        else:
+            parts.append(f"Listed prices range from **{_fmt_price(lo, cur, '')}** [{lo_i}] "
+                         f"to **{_fmt_price(hi, cur, unit)}** [{hi_i}].")
+    areas = []
+    for d in docs:
+        loc = (d.get("location") or "").split(",")[0].strip()
+        if loc and loc != "Saudi Arabia" and loc not in areas:
+            areas.append(loc)
+    if areas:
+        parts.append("Areas include " + ", ".join(areas[:4]) + ".")
+    parts.append("Open a source below for full details.")
+    return " ".join(parts)
