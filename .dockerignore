@@ -3,4 +3,5 @@
 __pycache__
 *.pyc
 .env
-data/*
+fly.toml
+data/*.jsonl

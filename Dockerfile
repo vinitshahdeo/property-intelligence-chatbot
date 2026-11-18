@@ -5,6 +5,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY scripts ./scripts
+COPY data ./data
 RUN mkdir -p /app/data && useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 EXPOSE 10000
